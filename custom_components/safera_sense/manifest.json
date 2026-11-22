@@ -28,5 +28,5 @@
   "issue_tracker": "https://github.com/crillebaba/ha-safera-sense/issues",
   "loggers": ["safera_sense_ble"],
   "requirements": ["safera-sense-ble==0.3.0"],
-  "version": "1.2.0"
+  "version": "1.2.0-tmjoen.1"
 }

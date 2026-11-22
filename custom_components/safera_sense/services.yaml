@@ -1,0 +1,19 @@
+send_command:
+  fields:
+    command:
+      required: true
+      example: 8195
+      selector:
+        number:
+          min: 0
+          max: 65535
+          mode: box
+    param:
+      required: true
+      example: 0
+      selector:
+        number:
+          min: 0
+          max: 255
+          mode: box
+dump: {}

@@ -114,6 +114,21 @@
           "boiling": "Boiling",
           "steak_in": "Steak in"
         }
+      },
+      "ventilation_mode": {
+        "name": "Ventilation mode",
+        "state": {
+          "off": "Off",
+          "kitchen": "Kitchen",
+          "bathroom_hood": "Bathroom (hood)",
+          "bathroom_ha": "Bathroom (Home Assistant)"
+        }
+      },
+      "roof_fan_output": {
+        "name": "Roof fan output"
+      },
+      "motor1_output": {
+        "name": "Motor 1 output"
       }
     },
     "button": {
@@ -137,6 +152,31 @@
       "sensor_problem": {
         "name": "Sensor problem"
       }
+    },
+    "switch": {
+      "bathroom_ventilation": {
+        "name": "Bathroom ventilation"
+      }
+    }
+  },
+  "services": {
+    "send_command": {
+      "name": "Send raw command",
+      "description": "Write a raw DEVICE_COMMAND (command code + parameter). For protocol testing.",
+      "fields": {
+        "command": {
+          "name": "Command",
+          "description": "Command code, e.g. 8195 (0x2003, Motor 2 raw speed)."
+        },
+        "param": {
+          "name": "Parameter",
+          "description": "Command parameter, e.g. 0-255 for a raw motor speed."
+        }
+      }
+    },
+    "dump": {
+      "name": "Dump characteristics",
+      "description": "Read every readable characteristic and return it as hex."
     }
   }
 }

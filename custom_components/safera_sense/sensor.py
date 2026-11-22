@@ -26,6 +26,7 @@ from homeassistant.helpers.typing import StateType
 
 from . import SaferaSenseConfigEntry
 from safera_sense_ble import ActivityType, CookingEventType, DeviceState, SensorReport
+from .const import VENTILATION_MODES
 from .coordinator import SaferaSenseCoordinator
 from .entity import SaferaSenseEntity
 
@@ -183,7 +184,65 @@ async def async_setup_entry(
     ]
     entities.append(SaferaWifiSsidSensor(coordinator))
     entities.append(SaferaSmartCookingSensor(coordinator))
+    entities.append(SaferaVentilationModeSensor(coordinator))
+    entities.append(
+        SaferaMotorOutputSensor(coordinator, "roof_fan_output", "motor2_raw")
+    )
+    entities.append(
+        SaferaMotorOutputSensor(
+            coordinator, "motor1_output", "motor1_raw", EntityCategory.DIAGNOSTIC
+        )
+    )
     async_add_entities(entities)
+
+
+class SaferaVentilationModeSensor(SaferaSenseEntity, SensorEntity):
+    """What the ventilation is doing: off, kitchen or bathroom.
+
+    "bathroom_hood" is inferred (the hood never reports it); see
+    SaferaSenseCoordinator._update_ventilation.
+    """
+
+    _attr_translation_key = "ventilation_mode"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = VENTILATION_MODES
+    _attr_icon = "mdi:hvac"
+
+    def __init__(self, coordinator: SaferaSenseCoordinator) -> None:
+        super().__init__(coordinator, "ventilation_mode")
+
+    @property
+    def native_value(self) -> str | None:
+        return self.coordinator.ventilation_mode
+
+
+class SaferaMotorOutputSensor(SaferaSenseEntity, SensorEntity):
+    """A live motor output from the raw report, as a percentage of 255."""
+
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:fan"
+
+    def __init__(
+        self,
+        coordinator: SaferaSenseCoordinator,
+        key: str,
+        attr: str,
+        category: EntityCategory | None = None,
+    ) -> None:
+        super().__init__(coordinator, key)
+        self._attr_translation_key = key
+        self._attr_entity_category = category
+        self._attr = attr
+
+    @property
+    def native_value(self) -> int | None:
+        raw = getattr(self.coordinator, self._attr)
+        return None if raw is None else round(raw * 100 / 255)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, int | None]:
+        return {"raw": getattr(self.coordinator, self._attr)}
 
 
 class SaferaSmartCookingSensor(SaferaSenseEntity, SensorEntity):

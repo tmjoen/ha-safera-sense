@@ -13,12 +13,22 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from safera_sense_ble import (
     CookingEvent,
     DeviceInfo,
-    SaferaSenseClient,
     SensorReport,
     WifiStatus,
 )
 
-from .const import DEFAULT_UPDATE_INTERVAL
+from .client import TrackingSaferaClient
+from .const import (
+    DEFAULT_UPDATE_INTERVAL,
+    MODE_BATHROOM_HA,
+    MODE_BATHROOM_HOOD,
+    MODE_KITCHEN,
+    MODE_OFF,
+    REPORT_MOTOR1,
+    REPORT_MOTOR2,
+    ROOF_FAN_IDLE_MAX,
+    STEP_COMMAND_GRACE,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,7 +72,7 @@ class SaferaSenseCoordinator(DataUpdateCoordinator[SensorReport]):
         update_interval: int = DEFAULT_UPDATE_INTERVAL,
     ) -> None:
         self.ble_device = ble_device
-        self.client = SaferaSenseClient(ble_device)
+        self.client = TrackingSaferaClient(ble_device)
         self.device_info: DeviceInfo | None = None
         self.wifi_status: WifiStatus | None = None
         self._shutdown = False
@@ -71,6 +81,11 @@ class SaferaSenseCoordinator(DataUpdateCoordinator[SensorReport]):
         # Smart Cooking: the most recent event-log entry (newest first),
         # used to derive the current cooking phase.
         self.last_cooking_event: CookingEvent | None = None
+        # Ventilation state derived from the raw report (see const.py).
+        self.motor1_raw: int | None = None
+        self.motor2_raw: int | None = None
+        self.ventilation_mode: str | None = None
+        self._prev_step: int | None = None
 
         super().__init__(
             hass,
@@ -138,11 +153,52 @@ class SaferaSenseCoordinator(DataUpdateCoordinator[SensorReport]):
             except Exception:  # noqa: BLE001
                 _LOGGER.debug("Characteristic dump failed", exc_info=True)
 
+    def _update_ventilation(self, report: SensorReport) -> bool:
+        """Derive motor outputs and ventilation mode; True if they changed.
+
+        The hood never reports its bathroom mode. It looks exactly like
+        level 4 (step 120, same motor outputs), with the damper shut. The
+        only tell is how it gets there: the bathroom mode jumps from step
+        0 straight to 120 in one report, while + presses walk through
+        30/60/90 about two seconds apart. A jump HA asked for is excluded
+        by STEP_COMMAND_GRACE.
+        """
+        before = (self.motor1_raw, self.motor2_raw, self.ventilation_mode)
+        self.motor1_raw = self.client.raw_byte(REPORT_MOTOR1)
+        self.motor2_raw = self.client.raw_byte(REPORT_MOTOR2)
+        step = report.fan_speed_raw
+        prev = self._prev_step
+        if step is None:
+            mode = None
+        elif step == 0:
+            mode = (
+                MODE_BATHROOM_HA
+                if (self.motor2_raw or 0) > ROOF_FAN_IDLE_MAX
+                else MODE_OFF
+            )
+        elif step == 120 and self.ventilation_mode == MODE_BATHROOM_HOOD:
+            mode = MODE_BATHROOM_HOOD
+        elif (
+            step == 120
+            and prev == 0
+            and not report.fan_auto
+            and time.monotonic() - self.client.last_step_command
+            > STEP_COMMAND_GRACE
+        ):
+            mode = MODE_BATHROOM_HOOD
+        else:
+            mode = MODE_KITCHEN
+        self._prev_step = step
+        self.ventilation_mode = mode
+        return before != (self.motor1_raw, self.motor2_raw, self.ventilation_mode)
+
     def _handle_report(self, report: SensorReport) -> None:
         """Handle a pushed sensor report (called from the event loop)."""
         now = time.monotonic()
+        ventilation_changed = self._update_ventilation(report)
         if (
-            is_eventful_change(self.data, report)
+            ventilation_changed
+            or is_eventful_change(self.data, report)
             or now - self._last_push >= self._throttle_seconds
         ):
             self._last_push = now
