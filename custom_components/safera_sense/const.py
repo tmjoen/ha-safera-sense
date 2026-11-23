@@ -12,13 +12,19 @@ MAX_UPDATE_INTERVAL = 300
 REPORT_MOTOR1 = 57  # damper on an ES (central-ventilation) hood
 REPORT_MOTOR2 = 58  # roof fan on an ES hood
 
-# Motor 2 output the hood itself leaves when off or at level 1. Anything
-# above this with the fan step at 0 is a raw command, i.e. our bathroom
-# ventilation.
-ROOF_FAN_IDLE_MAX = 13
+# Motor 2 output the hood leaves when it is off: the building's base
+# ventilation (the HOOD_MOTOR2_SPEED0 preset). Stopping bathroom
+# ventilation must return to this, not to 0, or base ventilation stays
+# off until the hood is next used.
+ROOF_FAN_BASE_SPEED = 13
 
-# Motor 2 output for bathroom ventilation: what the hood's own bathroom
-# mode uses (the installer's level-4 preset on this hood).
+# Anything above this with the fan step at 0 is a raw command, i.e. our
+# bathroom ventilation.
+ROOF_FAN_IDLE_MAX = ROOF_FAN_BASE_SPEED
+
+# Motor 2 output for bathroom ventilation. On this installation the roof
+# fan reaches full speed somewhere between raw 65 and 80, so 127 is
+# simply "full".
 BATHROOM_ROOF_FAN_SPEED = 127
 
 # Seconds after an HA fan-step command during which a 0 -> 120 jump is

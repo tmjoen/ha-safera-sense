@@ -3,8 +3,8 @@
 On a hood installed as "external motor + central ventilation" the roof
 fan also serves the bathroom. Driving Motor 2 (the roof fan) with a raw
 command while the fan step stays at 0 runs the roof fan with the
-kitchen damper shut, so all the suction comes from the bathroom. It is
-the same as the hood's own bathroom mode (hold +), at the same speed.
+kitchen damper shut, so all the suction comes from the bathroom, like
+the hood's own bathroom mode (hold +).
 
 The switch refuses to start while the hood is in use, and turning it off
 only stops ventilation that it started. How long it runs is left to an
@@ -23,7 +23,12 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from safera_sense_ble import DeviceCommand
 
 from . import SaferaSenseConfigEntry
-from .const import BATHROOM_ROOF_FAN_SPEED, MODE_BATHROOM_HA, MODE_OFF
+from .const import (
+    BATHROOM_ROOF_FAN_SPEED,
+    MODE_BATHROOM_HA,
+    MODE_OFF,
+    ROOF_FAN_BASE_SPEED,
+)
 from .coordinator import SaferaSenseCoordinator
 from .entity import SaferaSenseEntity
 
@@ -65,9 +70,11 @@ class SaferaBathroomVentilationSwitch(SaferaSenseEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         # Only stop what we started: if the hood is in use, the hood owns
-        # Motor 2 and a raw 0 would cut the kitchen extraction.
+        # Motor 2 and overriding it would cut the kitchen extraction.
         if self.coordinator.ventilation_mode != MODE_BATHROOM_HA:
             return
+        # Back to base ventilation, not 0: a raw value sticks until the
+        # hood is next used, and 0 would leave the building unventilated.
         await self.coordinator.client.send_command(
-            DeviceCommand.SET_HOOD_MOTOR2_SPEED_RAW, 0
+            DeviceCommand.SET_HOOD_MOTOR2_SPEED_RAW, ROOF_FAN_BASE_SPEED
         )
